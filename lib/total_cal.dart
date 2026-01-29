@@ -9,7 +9,7 @@ class TotalCalculatorPage extends StatefulWidget {
   State<TotalCalculatorPage> createState() => _TotalCalculatorPageState();
 }
 
-/// [모델] 주사 치료 구간
+// 주사 치료 구간
 class TreatmentSegment {
   DateTime startDate;
   String dosageLabel;
@@ -67,7 +67,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
   }
 
   void _initializeData() {
-    // 1. 시간 제거(Strip Time)하여 초기화
+    //시간 제거(Strip Time)하여 초기화
     final now = _stripTime(DateTime.now());
 
     // 먹는 약 초기화
@@ -98,8 +98,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // [Helper] 날짜 유틸리티
+  //날짜 유틸리티
   // ---------------------------------------------------------------------------
   DateTime _stripTime(DateTime date) {
     return DateTime(date.year, date.month, date.day);
@@ -118,8 +117,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     return DateTime(fullYear, month, day);
   }
 
-  // ---------------------------------------------------------------------------
-  // [Logic] 1. 먹는 약 로직
+  // 먹는 약 로직
   // ---------------------------------------------------------------------------
   void _calculateOralDays() {
     setState(() {
@@ -172,9 +170,9 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     }
   }
 
+  // 주사 치료 로직
   // ---------------------------------------------------------------------------
-  // [Logic] 2. 주사 치료 로직
-  // ---------------------------------------------------------------------------
+  // 주사 치료 로직 수정
   void _updateInjectionCalculations() {
     // 1. 날짜순 정렬
     _segments.sort((a, b) => a.startDate.compareTo(b.startDate));
@@ -202,8 +200,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
         if (i < _segments.length - 1) {
           days = end.difference(start).inDays;
         } else {
-          // 마지막 구간은 종료일 포함 (+1)
-          days = end.difference(start).inDays + 1;
+          days = end.difference(start).inDays;
         }
       }
 
@@ -212,11 +209,14 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
 
       tempTotal += calcAmount;
 
+      DateTime displayEndDate = end;
+      if (days > 0) {
+        displayEndDate = end.subtract(const Duration(days: 1));
+      }
+
       tempDetails.add({
         'start': start,
-        'end': (i < _segments.length - 1)
-            ? end.subtract(const Duration(days: 1))
-            : end,
+        'end': displayEndDate, // 수정됨: UI상 24일로 표시되도록 변경
         'days': days,
         'label': _segments[i].dosageLabel,
         'amount': calcAmount,
@@ -299,7 +299,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     DateTime lastStart = _segments.last.startDate;
     DateTime newDate;
 
-    // 스마트하게 다음 날짜 제안 (종료일 넘어가지 않게)
+    // 다음 날짜 제안 (종료일 넘어가지 않게)
     if (_injectionGlobalEndDate.isAfter(lastStart)) {
       int daysDiff = _injectionGlobalEndDate.difference(lastStart).inDays;
       newDate = lastStart.add(Duration(days: (daysDiff / 2).round()));
