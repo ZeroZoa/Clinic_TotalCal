@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+// 전체 누적 용량 계산기 페이지
 class TotalCalculatorPage extends StatefulWidget {
   const TotalCalculatorPage({super.key});
 
@@ -9,36 +10,45 @@ class TotalCalculatorPage extends StatefulWidget {
   State<TotalCalculatorPage> createState() => _TotalCalculatorPageState();
 }
 
-// 주사 치료 구간
+//주사 치료의 구간 1개를 표현하는 모델
 class TreatmentSegment {
+  //이 용량으로 치료를 시작한 날짜
   DateTime startDate;
+  // 이 구간에서 사용하는 용량 라벨
   String dosageLabel;
+  //YYMMDD형식의 날짜 입력 컨트롤러
   final TextEditingController dateController;
 
   TreatmentSegment({required this.startDate, this.dosageLabel = '3단위'})
       : dateController = TextEditingController(
       text: DateFormat('yyMMdd').format(startDate));
 
+  // 위젯이 제거될 때 컨트롤러 메모리를 해제한다
   void dispose() {
     dateController.dispose();
   }
 }
 
 class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
+  // 결과 표시용 날짜 포맷
   final DateFormat _formatter = DateFormat('yyyy-MM-dd');
 
-  //먹는 약
+  //먹는 약 복용 시작일
   late DateTime _oralStartDate;
+  //먹는 약 복용 종료일
   late DateTime _oralEndDate;
+  // 먹는 약 시작일 입력 컨트롤러
   final TextEditingController _oralStartCtrl = TextEditingController();
+  // 먹는 약 종료일 입력 컨트롤러
   final TextEditingController _oralEndCtrl = TextEditingController();
+  // 계산된 총 먹는 약 복용 일수
   int _totalOralDays = 0;
 
 
   //주사 치료
-  // 전체 종료일 (기본값: 오늘)
-  DateTime _injectionGlobalEndDate = DateTime.now();
-  // 전체 종료일 컨트롤러 (yymmdd 입력용)
+  // 전체 종료일 (기본값: 오늘 자정 기준)
+  DateTime _injectionGlobalEndDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+  // 전체 종료일 컨트롤러 (YYMMDD 입력용)
   final TextEditingController _injectionGlobalEndCtrl = TextEditingController();
 
   // 구간 리스트
@@ -46,10 +56,13 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
 
   // 계산 결과 캐싱
   double _totalInjections = 0;
+  // 구간별 상세 계산 결과 목록
   List<Map<String, dynamic>> _resultDetails = [];
+  // 날짜 설정에 논리 오류
   bool _hasInjectionDateError = false;
 
   // 용량 매핑 테이블
+  // 처방량 = 일수 × 계수
   final Map<String, double> _dosageMap = const {
     '2.5단위': 0.08333333333,
     '3단위': 0.1,
@@ -66,6 +79,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     _initializeData();
   }
 
+  // 앱 실행 시 모든 날짜·구간 데이터를 초기 상태로 설정한다
   void _initializeData() {
     //시간 제거(Strip Time)하여 초기화
     final now = _stripTime(DateTime.now());
@@ -77,7 +91,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     _oralEndCtrl.text = DateFormat('yyMMdd').format(_oralEndDate);
     _calculateOralDays();
 
-    // 주사 치료 초기화
+    //주사 종료일을 오늘로 설정
     _injectionGlobalEndDate = now;
     _injectionGlobalEndCtrl.text = DateFormat('yyMMdd').format(now);
 
@@ -89,6 +103,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
 
   @override
   void dispose() {
+    // 모든 TextEditingController 메모리 해제
     _oralStartCtrl.dispose();
     _oralEndCtrl.dispose();
     _injectionGlobalEndCtrl.dispose();
@@ -98,12 +113,16 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     super.dispose();
   }
 
-  //날짜 유틸리티
-  // ---------------------------------------------------------------------------
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //DateTime에서 시/분/초를 제거하고 날짜만 남김(정확히는 시간은 자정)
   DateTime _stripTime(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //YYMMDD 문자열을 DateTime으로 변환 -> dday_cal과 로직 동일
   DateTime _parseYYMMDD(String value) {
     int yearPrefix = int.parse(value.substring(0, 2));
     int fullYear = (yearPrefix > 50 ? 1900 : 2000) + yearPrefix;
@@ -117,18 +136,21 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     return DateTime(fullYear, month, day);
   }
 
-  // 먹는 약 로직
-  // ---------------------------------------------------------------------------
+
+
+  // 먹는 약 총 복용 일수를 계산하고 _totalOralDays에 저장
   void _calculateOralDays() {
-    setState(() {
-      if (_oralEndDate.isBefore(_oralStartDate)) {
-        _totalOralDays = 0;
-      } else {
-        _totalOralDays = _oralEndDate.difference(_oralStartDate).inDays + 1;
-      }
-    });
+    if (_oralEndDate.isBefore(_oralStartDate)) {
+      _totalOralDays = 0;
+    } else {
+      _totalOralDays = _oralEndDate.difference(_oralStartDate).inDays;
+    }
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  // 먹는 약 날짜 텍스트 필드 변경 시 호출
+  // [isStart] true = 시작일, false = 종료일
   void _onOralDateTextChanged(bool isStart, String value) {
     if (value.length != 6) return;
     try {
@@ -142,10 +164,13 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
         _calculateOralDays();
       });
     } catch (e) {
-      setState(() {}); // 에러 UI 갱신용
+      setState(() {});
     }
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  // 먹는 약 날짜를 달력 피커로 선택할 때 호출
   Future<void> _pickOralDate(bool isStart) async {
     final DateTime initial = isStart ? _oralStartDate : _oralEndDate;
     final DateTime? picked = await showDatePicker(
@@ -170,11 +195,11 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     }
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
   // 주사 치료 로직
-  // ---------------------------------------------------------------------------
-  // 주사 치료 로직 수정
   void _updateInjectionCalculations() {
-    // 1. 날짜순 정렬
+    //날짜를 오름차순으로 정렬
     _segments.sort((a, b) => a.startDate.compareTo(b.startDate));
 
     double tempTotal = 0;
@@ -185,38 +210,34 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
       DateTime start = _segments[i].startDate;
       DateTime end;
 
-      // 다음 구간의 시작일, 혹은 전체 종료일이 현재 구간의 끝
+      //해당 구간의 종료일 결정
       if (i < _segments.length - 1) {
+        //중간 구간 -> 다음 구간 시작일이 이 구간의 종료일
         end = _segments[i + 1].startDate;
       } else {
+        // 마지막 구간-> 전체 치료 종료일이 이 구간의 종료일
         end = _injectionGlobalEndDate;
       }
 
       int days;
       if (end.isBefore(start)) {
+        // 논리 오류 -> 종료일이 시작일보다 이전
         days = 0;
         tempHasError = true;
       } else {
-        if (i < _segments.length - 1) {
-          days = end.difference(start).inDays;
-        } else {
-          days = end.difference(start).inDays;
-        }
+        // 정상 -> 종료일 당일 제외하고 일수 계산
+        days = end.difference(start).inDays;
       }
 
+      // 이 구간의 처방량 = 일수 × 해당 용량 계수
       double dosageVal = _dosageMap[_segments[i].dosageLabel] ?? 0.0;
       double calcAmount = days * dosageVal;
 
       tempTotal += calcAmount;
 
-      DateTime displayEndDate = end;
-      if (days > 0) {
-        displayEndDate = end.subtract(const Duration(days: 1));
-      }
-
       tempDetails.add({
         'start': start,
-        'end': displayEndDate, // 수정됨: UI상 24일로 표시되도록 변경
+        'end': end,
         'days': days,
         'label': _segments[i].dosageLabel,
         'amount': calcAmount,
@@ -230,6 +251,8 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
       _hasInjectionDateError = tempHasError;
     });
   }
+
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
 
   // 주사 치료 종료일 변경 (YYMMDD)
   void _onInjectionGlobalEndDateChanged(String value) {
@@ -245,7 +268,9 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     }
   }
 
-  // 주사 치료 종료일 변경 (Calendar)
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //전체 치료 종료일을 달력 피커로 선택할 때 호출
   Future<void> _pickInjectionGlobalEndDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -263,7 +288,9 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     }
   }
 
-  // 세그먼트(구간) 날짜 변경
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //특정 구간의 시작일 텍스트 필드 변경 시 호출
   void _onSegmentDateChanged(int index, String value) {
     if (value.length != 6) return;
     try {
@@ -277,6 +304,9 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     }
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //특정 구간의 시작일을 달력 피커로 선택할 때 호출
   Future<void> _pickSegmentDate(int index) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -295,6 +325,11 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     }
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //새 구간을 추가
+  //새 구간의 시작일 -> 마지막 구간 시작일과 종료일의 중간값으로 자동 제안
+  //마지막 구간의 용량을 기본값으로 이어받는다 (연속 처방 케이스 대비)
   void _addSegment() {
     DateTime lastStart = _segments.last.startDate;
     DateTime newDate;
@@ -310,6 +345,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
         }
       }
     } else {
+      //마지막 시작일이 이미 종료일 이후면 종료일로 설정
       newDate = _injectionGlobalEndDate;
     }
 
@@ -322,6 +358,9 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     });
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  // 특정 구간을 삭제
   void _removeSegment(int index) {
     setState(() {
       _segments[index].dispose();
@@ -330,161 +369,151 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
     });
   }
 
-  // ===========================================================================
-  // [UI Build]
-  // ===========================================================================
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //화면 빌드
   @override
   Widget build(BuildContext context) {
-    // 3단 레이아웃을 위한 Row
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch, // 높이 꽉 채우기
-        children: [
-          // -----------------------------------------------------
-          // 1. 왼쪽 패널: 주사 치료 설정 (Fixed Width)
-          // -----------------------------------------------------
-          SizedBox(
-            width: 350,
-            child: Container(
-              color: Colors.grey.shade50,
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('GH 치료 기간',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo)),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildGlobalEndDatePicker(),
-                          const SizedBox(height: 20),
-                          _buildSegmentControlHeader(),
-                          const SizedBox(height: 10),
-                          _buildSegmentList(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      body: LayoutBuilder(     // ← 추가
+        builder: (context, constraints) {
+          final double totalWidth = constraints.maxWidth;
+          // 왼쪽: 25~30%, 최소 280 / 최대 400
+          final double leftWidth = (totalWidth * 0.27).clamp(280.0, 400.0);
+          // 오른쪽: 22~25%, 최소 250 / 최대 360
+          final double rightWidth = (totalWidth * 0.24).clamp(250.0, 360.0);
 
-          const VerticalDivider(width: 1, thickness: 1),
-
-          // -----------------------------------------------------
-          // 2. 가운데 패널: 주사 치료 상세 내역 (Expanded)
-          // -----------------------------------------------------
-          Expanded(
-            child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('상세 내역 및 결과',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87)),
-                  const SizedBox(height: 20),
-                  // 총 합계 카드
-                  _buildInjectionSummaryCard(),
-                  const SizedBox(height: 20),
-                  const Text('구간별 상세 계산', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  // 상세 리스트 (스크롤 가능)
-                  Expanded(
-                    child: _buildResultDetailList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const VerticalDivider(width: 1, thickness: 1),
-
-          // -----------------------------------------------------
-          // 3. 오른쪽 패널: 먹는 약 설정 (Fixed Width)
-          // -----------------------------------------------------
-          SizedBox(
-            width: 320,
-            child: Container(
-              color: Colors.orange.shade50.withOpacity(0.3),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('AI 치료 기간',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepOrange)),
-                  const SizedBox(height: 20),
-
-                  // 먹는 약 입력 폼
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade200),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildDateInputRow(
-                            '시작일', _oralStartCtrl, _oralStartDate, () => _pickOralDate(true)),
-                        const SizedBox(height: 16),
-                        _buildDateInputRow(
-                            '종료일', _oralEndCtrl, _oralEndDate, () => _pickOralDate(false)),
-                      ],
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  // 먹는 약 결과 표시
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.deepOrange,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.deepOrange.withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: leftWidth,           // ← 350 고정 → 동적
+                child: Container(
+                  color: Colors.grey.shade50,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('GH 치료 기간',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo)),
+                      const SizedBox(height: 20),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildGlobalEndDatePicker(),
+                              const SizedBox(height: 20),
+                              _buildSegmentControlHeader(),
+                              const SizedBox(height: 10),
+                              _buildSegmentList(),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('총 복용 일수',
-                            style: TextStyle(color: Colors.white70, fontSize: 14)),
-                        const SizedBox(height: 5),
-                        Text('$_totalOralDays일',
-                            style: const TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
+              const VerticalDivider(width: 1, thickness: 1),
+              Expanded(
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('상세 내역 및 결과',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87)),
+                      const SizedBox(height: 20),
+                      _buildInjectionSummaryCard(),
+                      const SizedBox(height: 20),
+                      const Text('구간별 상세 계산',
+                          style: TextStyle(
+                              color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildResultDetailList()),
+                    ],
+                  ),
+                ),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+              SizedBox(
+                width: rightWidth,          // ← 320 고정 → 동적
+                child: Container(
+                  color: Colors.orange.shade50.withValues(alpha: 0.3),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('AI 치료 기간',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepOrange)),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildDateInputRow('시작일', _oralStartCtrl,
+                                _oralStartDate, () => _pickOralDate(true)),
+                            const SizedBox(height: 16),
+                            _buildDateInputRow('종료일', _oralEndCtrl,
+                                _oralEndDate, () => _pickOralDate(false)),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.deepOrange,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.deepOrange.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('총 복용 일수',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 14)),
+                            const SizedBox(height: 5),
+                            Text('$_totalOralDays일',
+                                style: const TextStyle(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -618,7 +647,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
 
           // 용량 선택
           DropdownButtonFormField<String>(
-            value: _segments[index].dosageLabel,
+            initialValue: _segments[index].dosageLabel,
             isDense: true,
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),

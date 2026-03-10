@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+//D-Day계산기 페이지
+//시작일-종료일을 기준으로 계산
 class DDayCalculatorPage extends StatefulWidget {
   const DDayCalculatorPage({super.key});
 
@@ -10,105 +12,185 @@ class DDayCalculatorPage extends StatefulWidget {
 }
 
 class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now().add(const Duration(days: 90));
+  //정확한 날짜 계산을 위해 DateTime에서 시/분/초를 제거하고 날짜(자정 00:00:00)만 반환
+  DateTime _stripTime(DateTime d) => DateTime(d.year, d.month, d.day);
+  //시작 날짜를 년-월-일만 저장할 변수
+  DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+  //종료 날짜를 저장할 변수 & 사용자의 선택 전까지는 null
+  DateTime? _endDate;
+  //과거 날짜를 지정하거나했을때 오류를 띄우기 위한 변수
   String? _errorMessage;
-  final DateFormat _formatter = DateFormat('yyyy-MM-dd');
+  //사용자에게 YYMMDD로 입력된 날짜를 YYYY-MM-DD형태로 보여주기위한 변수
+  final DateFormat _displayFormatter = DateFormat('yyyy-MM-dd');
+  //시작일 입력 컨트롤러
+  final TextEditingController _startCtrl = TextEditingController();
+  //종료일 입력 컨트롤러
+  final TextEditingController _endCtrl = TextEditingController();
 
-  Future<void> _selectDate({required bool isStart}) async {
+  @override
+  void initState() {
+    super.initState();
+    //시작일(_startCtrl) 입력 컨트롤러 & 값을 오늘로 초기화
+    _startCtrl.text = DateFormat('yyMMdd').format(_startDate);
+    //종료일(_endCtrl) 입력 컨트롤러는 null이므로 컨트롤러 비워두기
+  }
+
+  @override
+  void dispose() {
+    //위젯이 트리에서 제거될 때 컨트롤러 메모리 해제
+    _startCtrl.dispose();
+    _endCtrl.dispose();
+    super.dispose();
+  }
+
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //날짜파싱 함수
+  DateTime _parseYYMMDD(String value) {
+    //입력한 날짜에서 년도인 앞 두글자 가져오기
+    int yearPrefix = int.parse(value.substring(0, 2));
+    //뒷자리 50을 기준으로 작으면 20xx 크면 19xx
+    int fullYear = (yearPrefix > 50 ? 1900 : 2000) + yearPrefix;
+    //입력한 날짜에서 월인 중간 두글자 가져오기
+    int month = int.parse(value.substring(2, 4));
+    //입력한 날짜에서 일인 마지막 두글자 가져오기
+    int day = int.parse(value.substring(4, 6));
+
+    if (month < 1 || month > 12) throw FormatException('Invalid Month');
+    // 해당 월의 실제 말일을 구해 일 유효성 검사
+    int daysInMonth = DateTime(fullYear, month + 1, 0).day;
+    if (day < 1 || day > daysInMonth) throw FormatException('Invalid Day');
+
+    return DateTime(fullYear, month, day);
+  }
+
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //텍스트 필드(_startCtrl, _endCtrl)가 갱신될때마다 호출되는 함수
+  //디데이 계산을 업데이트하기 위함
+  void _onDateTextChanged(bool isStart, String value) {
+    // 6자리 미만이면 아직 입력 중 → 무시
+    if (value.length != 6) return;
+
+    //날짜 파싱 함수를 통해 받은 값 가져오기 + 유효한 날짜인지 검증 -> 오류면 상태 갱신으로 에러 테두리만 표시
+    try {
+      DateTime parsed = _parseYYMMDD(value);
+      setState(() {
+        if (isStart) {
+          _startDate = parsed;
+        } else {
+          _endDate = parsed;
+        }
+        _validateDates();
+      });
+    } catch (e) {
+      setState(() {});
+    }
+  }
+
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //달력 아이콘을 눌러 날짜 피커를 열 때 호출
+  //종료일이 미선택 상태면 오늘 기준 90일 뒤(약 3개월)를 기본 표시
+  //[isStart] true = 시작일 피커, false = 종료일 피커
+  Future<void> _pickDate({required bool isStart}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? _startDate : _endDate,
+      initialDate: isStart ? _startDate : (_endDate ?? _stripTime(DateTime.now().add(const Duration(days: 90)))),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
     if (picked != null) {
+      DateTime stripped = _stripTime(picked);//시간제거 -> 날짜만 반환
       setState(() {
         if (isStart) {
-          _startDate = picked;
+          _startDate = stripped;
+          _startCtrl.text = DateFormat('yyMMdd').format(stripped);// 컨트롤러 동기화
         } else {
-          _endDate = picked;
+          _endDate = stripped;
+          _endCtrl.text = DateFormat('yyMMdd').format(stripped);// 컨트롤러 동기화
         }
         _validateDates();
       });
     }
   }
 
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  //현재 시작일과 종료일의 논리 유효성을 검사
+  //종료일이 시작일보다 이전이면 오류 메시지 설정
   void _validateDates() {
-    if (_endDate.isBefore(_startDate)) {
+    if (_endDate == null) {
+      _errorMessage = null;
+      return;
+    }
+    if (_endDate!.isBefore(_startDate)) {
       _errorMessage = '종료일은 시작일 이후여야 합니다.';
     } else {
       _errorMessage = null;
     }
   }
 
+
+  //──────────────────────────────────────────────────────────────────────────────────────────────────────
+  //화면 빌드
   @override
   Widget build(BuildContext context) {
-    final int dDay = _endDate.difference(_startDate).inDays + 1;
+    // D-Day 계산은 종료일 선택 + 오류 없음일 때만 계산함
+    final int? dDay = (_endDate != null && _errorMessage == null)
+        ? _endDate!.difference(_startDate).inDays
+        : null;
 
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // [왼쪽 패널] 달력 (300px 고정)
-            SizedBox(
-              width: 300,
-              child: _buildLeftPanel(dDay),
-            ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final double totalWidth = constraints.maxWidth;
+          final double leftWidth = (totalWidth * 0.30).clamp(260.0, 340.0);
 
-            const SizedBox(width: 15),
-
-            // [오른쪽 패널] 남은 공간 채우기 (Expanded)
-            Expanded(
-              child: _buildRightPanel(dDay),
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: leftWidth,
+                  child: _buildLeftPanel(dDay),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: _buildRightPanel(dDay),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildLeftPanel(int dDay) {
+  Widget _buildLeftPanel(int? dDay) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text('시작일',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 10),
-            Text(_formatter.format(_startDate),
-                style: const TextStyle(fontSize: 18)),
-            const Spacer(),
-            ElevatedButton(
-              onPressed: () => _selectDate(isStart: true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                foregroundColor: Colors.white,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('수정', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            const Text('종료일',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 10),
-            Text(_formatter.format(_endDate),
-                style: const TextStyle(fontSize: 18)),
-          ],
+        // 시작일 입력
+        _buildDateInputRow(
+          label: '시작일',
+          controller: _startCtrl,
+          date: _startDate,
+          isStart: true,
         ),
         const SizedBox(height: 10),
 
-        // 달력 컨테이너
+        // 종료일 입력
+        _buildDateInputRow(
+          label: '종료일',
+          controller: _endCtrl,
+          date: _endDate,
+          isStart: false,
+        ),
+        const SizedBox(height: 10),
+
+        // 달력 (종료일 선택용)
         Container(
           width: double.infinity,
           height: 300,
@@ -122,12 +204,14 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
               width: 300,
               height: 340,
               child: CalendarDatePicker(
-                initialDate: _endDate,
+                initialDate: _endDate ?? _stripTime(DateTime.now().add(const Duration(days: 90))),
                 firstDate: DateTime(2000),
                 lastDate: DateTime(2100),
                 onDateChanged: (picked) {
+                  DateTime stripped = _stripTime(picked);
                   setState(() {
-                    _endDate = picked;
+                    _endDate = stripped;
+                    _endCtrl.text = DateFormat('yyMMdd').format(stripped);
                     _validateDates();
                   });
                 },
@@ -137,30 +221,134 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
         ),
         const SizedBox(height: 10),
 
+        // D-Day 표시
         Center(
           child: _errorMessage != null
               ? Text(
-            _errorMessage!,
-            style: const TextStyle(
-                color: Colors.red,
-                fontSize: 14,
-                fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          )
-              : Text(
-            'D-Day $dDay',
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.indigo,
+                  _errorMessage!,
+                  style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                )
+              : dDay == null
+                  ? const Text(
+                      '종료일을 선택해주세요',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    )
+                  : Text(
+                      'D-Day $dDay',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo,
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateInputRow({
+    required String label,
+    required TextEditingController controller,
+    required DateTime? date,
+    required bool isStart,
+  }) {
+    bool isError = false;
+    if (controller.text.length == 6) {
+      try {
+        _parseYYMMDD(controller.text);
+      } catch (e) {
+        isError = true;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            Text(
+              date != null ? _displayFormatter.format(date) : '선택 안 됨',
+              style: TextStyle(
+                fontSize: 13,
+                color: date != null ? Colors.black54 : Colors.grey.shade400,
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(
+                color: isError ? Colors.red : Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: 'YYMMDD',
+                    hintStyle:
+                        const TextStyle(color: Colors.black38, fontSize: 13),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 5),
+                    errorText: isError ? '' : null,
+                    errorStyle: const TextStyle(height: 0),
+                  ),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w900),
+                  onChanged: (val) => _onDateTextChanged(isStart, val),
+                ),
+              ),
+              Container(width: 1, height: 20, color: Colors.grey.shade300),
+              IconButton(
+                onPressed: () => _pickDate(isStart: isStart),
+                icon: const Icon(Icons.calendar_today,
+                    size: 18, color: Colors.indigo),
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 40, minHeight: 40),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildRightPanel(int dDay) {
+  Widget _buildRightPanel(int? dDay) {
+    if (dDay == null) {
+      return const Center(
+        child: Text(
+          '왼쪽 달력에서\n종료일을 선택해주세요',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, color: Colors.grey),
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -178,7 +366,6 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
             [Colors.purple.shade100, Colors.purple.shade50], 6, context),
         _buildUnitContainer('7.5단위', dDay * 0.25,
             [Colors.pink.shade100, Colors.pink.shade50], 7.5, context),
-
       ],
     );
   }
@@ -186,16 +373,14 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
   Widget _buildUnitContainer(String label, double value,
       List<Color> gradientColors, double degree, BuildContext context) {
     String degreeStr =
-    (degree % 1 == 0) ? degree.toInt().toString() : degree.toString();
+        (degree % 1 == 0) ? degree.toInt().toString() : degree.toString();
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
-      // [수정] Row 자체가 화면 너비를 따라가도록 설정
       child: Row(
         children: [
-          // [핵심] Flexible: 화면이 좁아지면 너비만 줄어듦 (높이 고정)
           Flexible(
-            fit: FlexFit.loose, // 최대 크기(380)까지만 늘어남
+            fit: FlexFit.loose,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
@@ -203,18 +388,19 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                 onTap: () {
                   Clipboard.setData(ClipboardData(
                       text:
-                      'D C ($degreeStr단위) > 호르몬: 개 처방부탁드려요. (호르몬: 개  보유중)'));
+                          'D C ($degreeStr단위) > 호르몬: 개 처방부탁드려요.(호르몬: 개 보유)'));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$degreeStr 먹는 약X 클립보드에 복사되었습니다')),
+                    SnackBar(
+                        content: Text('$degreeStr 먹는 약X 클립보드에 복사되었습니다')),
                   );
                 },
                 child: Container(
                   constraints: const BoxConstraints(
-                    maxWidth: 380, // PC 화면에서 너무 길어지지 않게 제한
-                    minHeight: 50, // 최소 높이 보장 (찌그러짐 방지)
+                    maxWidth: 380,
+                    minHeight: 50,
                   ),
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: gradientColors,
@@ -223,11 +409,9 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                     ),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  // 내부 텍스트 처리
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // 라벨 (2.5단위)
                       Text(
                         label,
                         style: const TextStyle(
@@ -236,7 +420,6 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                           color: Colors.black,
                         ),
                       ),
-                      // 화면이 아주 좁을 때만 글자가 겹치지 않게 FittedBox로 '글자 크기'만 축소
                       Flexible(
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
@@ -259,16 +442,16 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
           ),
           const SizedBox(width: 8),
 
-          // [오른쪽] 먹는 약 버튼 (크기 고정)
           SizedBox(
             width: 60,
             child: ElevatedButton(
               onPressed: () {
                 Clipboard.setData(ClipboardData(
                     text:
-                    'D C ($degreeStr단위) > 호르몬: 개 먹는 약: 알 처방부탁드려요. (호르몬: 개  , 먹는 약: 알 보유중)'));
+                        'D C ($degreeStr단위) > 호르몬: 개 먹는 약: 알 처방부탁드려요. (호르몬: 개/먹는 약: 알 보유)'));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$degreeStr 먹는 약O 클립보드에 복사되었습니다')),
+                  SnackBar(
+                      content: Text('$degreeStr 먹는 약O 클립보드에 복사되었습니다')),
                 );
               },
               style: ElevatedButton.styleFrom(
