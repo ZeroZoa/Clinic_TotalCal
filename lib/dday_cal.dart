@@ -12,8 +12,6 @@ class DDayCalculatorPage extends StatefulWidget {
 }
 
 class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
-  // === 💡 기존 로직 유지 영역 ===
-
   // 정확한 날짜 계산을 위해 DateTime에서 시/분/초를 제거하고 날짜(자정 00:00:00)만 반환
   DateTime _stripTime(DateTime d) => DateTime(d.year, d.month, d.day);
   // 시작 날짜를 년-월-일만 저장할 변수
@@ -42,6 +40,9 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
     super.dispose();
   }
 
+  // YYMMDD 문자열 → DateTime 변환
+  // YY > 50이면 1900년대, 이하면 2000년대로 해석
+  // 유효하지 않은 월/일이면 FormatException throw
   DateTime _parseYYMMDD(String value) {
     int yearPrefix = int.parse(value.substring(0, 2));
     int fullYear = (yearPrefix > 50 ? 1900 : 2000) + yearPrefix;
@@ -72,10 +73,14 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
     }
   }
 
+  // 달력 아이콘 탭 시 날짜 피커 오픈
+  // 종료일 미선택 상태면 오늘 +90일(3개월)을 기본 표시
   Future<void> _pickDate({required bool isStart}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? _startDate : (_endDate ?? _stripTime(DateTime.now().add(const Duration(days: 90)))),
+      initialDate: isStart
+          ? _startDate
+          : (_endDate ?? _stripTime(DateTime.now().add(const Duration(days: 90)))),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
       builder: (context, child) {
@@ -106,6 +111,8 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
     }
   }
 
+  // 날짜 유효성 검사
+  // _endDate null이면 오류 없음, 종료일 < 시작일이면 오류 메시지 설정
   void _validateDates() {
     if (_endDate == null) {
       _errorMessage = null;
@@ -117,8 +124,6 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
       _errorMessage = null;
     }
   }
-
-  // === 💡 UI 영역 ===
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +165,7 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
     );
   }
 
+  // 왼쪽 패널: 시작일/종료일 입력 + 달력
   Widget _buildLeftPanel(int? dDay) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -184,7 +190,7 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
           date: _endDate,
           isStart: false,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
 
         Container(
           decoration: BoxDecoration(
@@ -203,38 +209,6 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                 _validateDates();
               });
             },
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // D-Day 표시부
-        Center(
-          child: _errorMessage != null
-              ? Text(
-            _errorMessage!,
-            style: const TextStyle(
-                color: Colors.red,
-                fontSize: 16,
-                fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          )
-              : dDay == null
-              ? const Text(
-            '종료일을 선택해주세요',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          )
-              : Text(
-            'D-Day $dDay',
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w900,
-              color: Colors.indigo,
-            ),
           ),
         ),
       ],
@@ -349,13 +323,15 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
 
   Widget _buildRightPanel(int? dDay) {
     if (dDay == null) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 40.0),
-          child: Text(
-            '왼쪽 달력에서\n종료일을 선택해주세요',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, color: Colors.grey, height: 1.5),
+      return Center(
+        child: Text(
+          _errorMessage ?? '왼쪽 달력에서\n종료일을 선택해주세요',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            color: _errorMessage != null ? Colors.red : Colors.grey,
+            fontWeight: _errorMessage != null ? FontWeight.bold : FontWeight.normal,
+            height: 1.5,
           ),
         ),
       );
@@ -363,6 +339,18 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // D-Day 표시부
+        Center(
+          child: Text(
+            'D-Day $dDay',
+            style: const TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              color: Colors.indigo,
+            ),
+          ),
+        ),
+
         _buildUnitContainer('2.5단위', dDay * 0.08333333333, [Colors.amber.shade100, Colors.amber.shade50], 2.5, context),
         _buildUnitContainer('3단위', dDay * 0.1, [Colors.orange.shade100, Colors.orange.shade50], 3, context),
         _buildUnitContainer('4단위', dDay * 0.125, [Colors.green.shade100, Colors.green.shade50], 4, context),
@@ -395,7 +383,7 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.black.withOpacity(0.05)),
+                    border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
                   ),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
@@ -406,7 +394,7 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                       );
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

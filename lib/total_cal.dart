@@ -245,11 +245,9 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
       });
     }
 
-    setState(() {
-      _totalInjections = tempTotal;
-      _resultDetails = tempDetails;
-      _hasInjectionDateError = tempHasError;
-    });
+    _totalInjections = tempTotal;
+    _resultDetails = tempDetails;
+    _hasInjectionDateError = tempHasError;
   }
 
   //──────────────────────────────────────────────────────────────────────────────────────────────────────
