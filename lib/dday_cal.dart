@@ -198,6 +198,7 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: CalendarDatePicker(
+            key: ValueKey(_endDate),
             initialDate: _endDate ?? _stripTime(DateTime.now().add(const Duration(days: 90))),
             firstDate: DateTime(2000),
             lastDate: DateTime(2100),

@@ -534,7 +534,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
             border: Border.all(color: Colors.grey.shade300),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: _buildDateInputContent(_injectionGlobalEndCtrl, _injectionGlobalEndDate, _onInjectionGlobalEndDateChanged, _pickInjectionGlobalEndDate),
+          child: _buildDateInputContent(_injectionGlobalEndCtrl, _onInjectionGlobalEndDateChanged, _pickInjectionGlobalEndDate),
         ),
       ],
     );
@@ -636,7 +636,6 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
           // 날짜 입력
           _buildDateInputContent(
               _segments[index].dateController,
-              _segments[index].startDate,
                   (val) => _onSegmentDateChanged(index, val),
                   () => _pickSegmentDate(index)
           ),
@@ -793,7 +792,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
             border: Border.all(color: Colors.grey.shade300),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: _buildDateInputContent(controller, date, (val) {
+          child: _buildDateInputContent(controller, (val) {
             // 먹는 약 콜백 연결
             if (label == '시작일') _onOralDateTextChanged(true, val);
             if (label == '종료일') _onOralDateTextChanged(false, val);
@@ -804,7 +803,7 @@ class _TotalCalculatorPageState extends State<TotalCalculatorPage> {
   }
 
   // 텍스트필드와 달력 아이콘이 결합된 내부 위젯
-  Widget _buildDateInputContent(TextEditingController controller, DateTime date, Function(String) onChanged, VoidCallback onTapCalendar) {
+  Widget _buildDateInputContent(TextEditingController controller, Function(String) onChanged, VoidCallback onTapCalendar) {
     bool isError = false;
     if (controller.text.length == 6) {
       try { _parseYYMMDD(controller.text); } catch(e) { isError = true; }

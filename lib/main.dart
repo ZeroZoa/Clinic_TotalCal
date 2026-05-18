@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 //라우팅을 위한 파일들을 import
 import 'dday_cal.dart';
 import 'total_cal.dart';
+import 'usage_cal.dart';
 
 //Flutter App Main으로 앱의 시작점
 void main() {
@@ -65,6 +66,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _pages = [
     const DDayCalculatorPage(),
     const TotalCalculatorPage(),
+    const UsageCalculatorPage(),
   ];
 
   //하단 탭 아이템을 탭했을 때 호출되는 콜백
@@ -98,6 +100,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.calculate),
             label: '처방량 계산기',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.access_alarm),
+            label: '사용일자 계산기',
           ),
         ],
       ),
