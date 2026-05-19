@@ -452,38 +452,51 @@ class _UsageCalculatorPageState extends State<UsageCalculatorPage> {
           border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 왼쪽: 용량 라벨
-            Text(label,
+            // 용량 라벨: 남은 공간 차지
+            Expanded(
+              child: Text(
+                label,
                 style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Colors.black87)),
-            Spacer(),
-            // 오른쪽: 사용 가능 일수 + 종료일
-            Text(
-              '~ ${_displayFormatter.format(endDate)} 까지',
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87),
+                    color: Colors.black87),
+              ),
             ),
-            SizedBox(width: 40,),
-            Text(
-              '|',
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87),
+            // 종료일: 고정 너비 + 우측 정렬 → 카드마다 같은 x좌표
+            SizedBox(
+              width: 240,
+              child: Text(
+                '~ ${_displayFormatter.format(endDate)} 까지',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87),
+              ),
             ),
-            SizedBox(width: 40,),
-            Text(
-              '$days일',
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black54),
+            // 구분선: 고정 패딩으로 간격 통일
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                '|',
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black38),
+              ),
+            ),
+            // 일수: 고정 너비 + 우측 정렬 → 2자리·3자리 모두 같은 열에 정렬
+            SizedBox(
+              width: 80,
+              child: Text(
+                '$days일',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black54),
+              ),
             ),
           ],
         ),

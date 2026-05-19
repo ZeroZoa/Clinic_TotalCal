@@ -401,11 +401,11 @@ class _DDayCalculatorPageState extends State<DDayCalculatorPage> {
                         children: [
                           Text(
                             label,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.black87),
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.black87),
                           ),
                           Text(
                             '→  ${value.toStringAsFixed(1)}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
                         ],
                       ),
