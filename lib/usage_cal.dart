@@ -460,23 +460,30 @@ class _UsageCalculatorPageState extends State<UsageCalculatorPage> {
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: Colors.black87)),
+            Spacer(),
             // 오른쪽: 사용 가능 일수 + 종료일
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '$days일',
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87),
-                ),
-                Text(
-                  '~ ${_displayFormatter.format(endDate)}',
-                  style: const TextStyle(
-                      fontSize: 13, color: Colors.black54),
-                ),
-              ],
+            Text(
+              '~ ${_displayFormatter.format(endDate)} 까지',
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87),
+            ),
+            SizedBox(width: 40,),
+            Text(
+              '|',
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87),
+            ),
+            SizedBox(width: 40,),
+            Text(
+              '$days일',
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54),
             ),
           ],
         ),
